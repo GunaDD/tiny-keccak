@@ -14,7 +14,8 @@ use super::{bits_to_rate, keccakf::KeccakF, Hasher, KeccakState};
 /// [`Keccak SHA3 submission`]: https://keccak.team/files/Keccak-submission-3.pdf
 #[derive(Clone)]
 pub struct Keccak {
-    state: KeccakState<KeccakF>,
+    /// Internal Keccak state.
+    pub state: KeccakState<KeccakF>,
 }
 
 impl Keccak {
@@ -89,5 +90,69 @@ impl Hasher for Keccak {
     /// ```
     fn finalize(self, output: &mut [u8]) {
         self.state.finalize(output);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    extern crate std;
+    use super::Keccak;
+    use crate::Hasher;
+
+    fn finalize(mut hasher: Keccak, output: &mut [u8]) {
+        let words: &mut [u64; 25] = hasher.state.buffer.words();
+        let input: &mut [u8; 200] = unsafe { core::mem::transmute(words) };
+        let buffer: &mut [u8] = &mut input[0..136];
+
+        for i in hasher.state.offset..hasher.state.rate {
+            buffer[i] = 0;
+        }
+        buffer[hasher.state.offset] |= 0x01;
+        buffer[hasher.state.rate - 1] |= 0x80;
+        
+        hasher.update(buffer);
+        hasher.state.buffer.setout(output, hasher.state.offset, output.len());
+        std::println!("buffer: {:?}", hasher.state.buffer.words());
+    }
+
+    #[test]
+    fn test_specs() {
+        let mut hasher = Keccak::v256();
+        let input: &[u8] = &[1; 136];
+        hasher.update(input);
+
+        std::println!("buffer: {:?}", hasher.state.buffer.words());
+        std::println!("offset: {:?}", hasher.state.offset);
+
+        let input2: &[u8] = &[1; 1];
+        hasher.update(input2);
+
+        std::println!("buffer: {:?}", hasher.state.buffer.words());
+        std::println!("offset: {:?}", hasher.state.offset);
+
+        let mut output = [0u8; 32];
+        hasher.finalize(&mut output);
+        std::println!("output: {:?}", output);
+        
+    }
+
+    #[test]
+    fn test_finalize() {
+        let mut hasher = Keccak::v256();
+        let input: &[u8] = &[1; 136];
+        hasher.update(input);
+
+        std::println!("buffer: {:?}", hasher.state.buffer.words());
+        std::println!("offset: {:?}", hasher.state.offset);
+
+        let input2: &[u8] = &[1; 1];
+        hasher.update(input2);
+
+        std::println!("buffer: {:?}", hasher.state.buffer.words());
+        std::println!("offset: {:?}", hasher.state.offset);
+
+        let mut output = [0u8; 32];
+        finalize(hasher, &mut output);
+        std::println!("{:?}", output);
     }
 }

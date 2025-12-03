@@ -301,7 +301,7 @@ fn right_encode(len: usize) -> EncodedLen {
 struct Buffer([u64; WORDS]);
 
 impl Buffer {
-    fn words(&mut self) -> &mut [u64; WORDS] {
+    pub fn words(&mut self) -> &mut [u64; WORDS] {
         &mut self.0
     }
 
@@ -366,12 +366,12 @@ enum Mode {
 }
 
 struct KeccakState<P> {
-    buffer: Buffer,
-    offset: usize,
-    rate: usize,
-    delim: u8,
-    mode: Mode,
-    permutation: core::marker::PhantomData<P>,
+    pub buffer: Buffer,
+    pub offset: usize,
+    pub rate: usize,
+    pub delim: u8,
+    pub mode: Mode,
+    pub permutation: core::marker::PhantomData<P>,
 }
 
 impl<P> Clone for KeccakState<P> {
@@ -404,7 +404,7 @@ impl<P: Permutation> KeccakState<P> {
         P::execute(&mut self.buffer);
     }
 
-    fn update(&mut self, input: &[u8]) {
+    pub fn update(&mut self, input: &[u8]) {
         if let Mode::Squeezing = self.mode {
             self.mode = Mode::Absorbing;
             self.fill_block();
@@ -428,7 +428,7 @@ impl<P: Permutation> KeccakState<P> {
         self.offset = offset + l;
     }
 
-    fn pad(&mut self) {
+    pub fn pad(&mut self) {
         self.buffer.pad(self.offset, self.delim, self.rate);
     }
 
@@ -457,11 +457,13 @@ impl<P: Permutation> KeccakState<P> {
         self.offset = offset + l;
     }
 
-    fn finalize(mut self, output: &mut [u8]) {
+    pub fn finalize(mut self, output: &mut [u8]) {
         self.squeeze(output);
+        extern crate std;
+        std::println!("buffer: {:?}", self.buffer.words());
     }
 
-    fn fill_block(&mut self) {
+    pub fn fill_block(&mut self) {
         self.keccak();
         self.offset = 0;
     }
