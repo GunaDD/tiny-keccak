@@ -333,7 +333,21 @@ impl Buffer {
         self.execute(offset, len, |buffer| dst[..len].copy_from_slice(buffer));
     }
 
+    fn xorin_openvm_opcode(&mut self, mut buffer_ptr: *mut u8, input_ptr: *const u8, len: usize) {
+        let buf_u8: &mut [u8; 200] = unsafe { &mut *(buffer_ptr as *mut [u8; 200]) };
+        let input_u8: &[u8] = unsafe { core::slice::from_raw_parts(input_ptr as *const u8, len) };
+
+        for i in 0..len {
+            buf_u8[i] ^= input_u8[i];
+        }
+    }
+
     fn xorin(&mut self, src: &[u8], offset: usize, len: usize) {
+        let buffer_ptr = unsafe { (self.0.as_mut_ptr() as *mut u8).add(offset) };
+        let input_ptr = src.as_ptr();
+        self.xorin_openvm_opcode(buffer_ptr, input_ptr, len);
+
+        /* 
         self.execute(offset, len, |dst| {
             assert!(dst.len() <= src.len());
             let len = dst.len();
@@ -347,6 +361,7 @@ impl Buffer {
                 }
             }
         });
+        */
     }
 
     fn pad(&mut self, offset: usize, delim: u8, rate: usize) {
@@ -400,8 +415,15 @@ impl<P: Permutation> KeccakState<P> {
         }
     }
 
+    fn keccak_openvm_opcode(&mut self, mut buffer_ptr: *mut u8) {
+        let buffer: &mut Buffer = unsafe { &mut *(buffer_ptr as *mut Buffer) };
+        keccakf(buffer.words());
+    }
+
     fn keccak(&mut self) {
-        P::execute(&mut self.buffer);
+        // P::execute(&mut self.buffer);
+        let buffer_ptr = unsafe { self.buffer.0.as_mut_ptr() as *mut u8 };
+        self.keccak_openvm_opcode(buffer_ptr);
     }
 
     pub fn update(&mut self, input: &[u8]) {
@@ -459,8 +481,8 @@ impl<P: Permutation> KeccakState<P> {
 
     pub fn finalize(mut self, output: &mut [u8]) {
         self.squeeze(output);
-        extern crate std;
-        std::println!("buffer: {:?}", self.buffer.words());
+        // extern crate std;
+        // std::println!("buffer: {:?}", self.buffer.words());
     }
 
     pub fn fill_block(&mut self) {
